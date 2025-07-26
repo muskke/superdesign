@@ -6,7 +6,7 @@ import MarkdownRenderer from '../MarkdownRenderer';
 import { TaskIcon, ClockIcon, CheckIcon, LightBulbIcon, GroupIcon, BrainIcon } from '../Icons';
 import Welcome from '../Welcome';
 import ThemePreviewCard from './ThemePreviewCard';
-import ModelSelector from './ModelSelector';
+import ModelSelector, { ModelOption } from './ModelSelector';
 import chatStyles from './ChatInterface.css';
 import welcomeStyles from '../Welcome/Welcome.css';
 
@@ -20,6 +20,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ layout, vscode }) => {
     const { isFirstTime, isLoading: isCheckingFirstTime, markAsReturningUser, resetFirstTimeUser } = useFirstTimeUser();
     const [inputMessage, setInputMessage] = useState('');
     const [selectedModel, setSelectedModel] = useState<string>('claude-3-5-sonnet-20241022');
+    const [customProviders, setCustomProviders] = useState<ModelOption[]>([]);
     const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
     const [showFullContent, setShowFullContent] = useState<{[key: string]: boolean}>({});
     const [currentContext, setCurrentContext] = useState<{fileName: string; type: string} | null>(null);
@@ -63,6 +64,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ layout, vscode }) => {
                         break;
                 }
                 setSelectedModel(message.model || fallbackModel);
+                if (message.customProviders) {
+                    setCustomProviders(message.customProviders);
+                }
             } else if (message.command === 'providerChanged') {
                 setSelectedModel(message.model);
             }
@@ -1126,7 +1130,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ layout, vscode }) => {
                                     <CheckIcon />
                                 </span>
                             )}
-                            <button className={`tool-expand-btn ${isExpanded ? 'expanded' : ''}`}>
+                            <button
+                                className={`tool-expand-btn ${isExpanded ? 'expanded' : ''}`}
+                                title={isExpanded ? "Collapse Details" : "Expand Details"}
+                            >
                                 <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
                                     <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
                                 </svg>
@@ -1445,6 +1452,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ layout, vscode }) => {
                                         selectedModel={selectedModel}
                                         onModelChange={handleModelChange}
                                         disabled={isLoading || showWelcome}
+                                        customProviders={customProviders}
                                     />
                                 </div>
                             </div>

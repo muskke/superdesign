@@ -1399,7 +1399,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Register command to set the active custom provider
 	const setActiveCustomProviderDisposable = vscode.commands.registerCommand('superdesign.setActiveCustomProvider', async () => {
-		await promptForCustomProvider();
+		await promptForCustomProvider(sidebarProvider);
 	});
 
 	// Listen for configuration changes
@@ -1410,7 +1410,7 @@ export function activate(context: vscode.ExtensionContext) {
 			if (provider === 'custom') {
 				// Use a timeout to ensure the configuration has settled
 				setTimeout(() => {
-					promptForCustomProvider();
+					promptForCustomProvider(sidebarProvider);
 				}, 100);
 			}
 		}
@@ -1435,7 +1435,7 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 // Function to prompt the user to select a custom provider
-async function promptForCustomProvider() {
+async function promptForCustomProvider(sidebarProvider: ChatSidebarProvider) {
 	const config = vscode.workspace.getConfiguration('superdesign');
 	const customProviders = config.get<any[]>('customProviders', []);
 
@@ -1467,6 +1467,11 @@ async function promptForCustomProvider() {
 		try {
 			await config.update('activeCustomProviderName', selectedProvider.name, vscode.ConfigurationTarget.Global);
 			vscode.window.showInformationMessage(`✅ Custom AI provider set to: ${selectedProvider.name}`);
+
+			// Notify the webview that the provider has changed
+			const modelId = `custom/${selectedProvider.name}`;
+			sidebarProvider.notifyProviderChanged(modelId);
+			
 		} catch (error) {
 			Logger.error(`Failed to set active custom provider: ${error}`);
 			vscode.window.showErrorMessage(`Failed to save active custom provider setting: ${error}`);

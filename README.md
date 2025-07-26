@@ -85,21 +85,20 @@ Open your VS Code User Settings (JSON) file and add the `superdesign.customProvi
 ```
 
 **Field Descriptions:**
-- `name`: A unique, recognizable name for your provider.
+- `name`: A unique, recognizable name for your provider. This name will appear in the model selector.
 - `protocol`: The API format the endpoint uses. Can be `"openai"`, `"anthropic"`, or `"gemini"`.
 - `baseURL`: The base URL of the API endpoint.
 - `apiKey`: The API key for the service. For local Ollama, you can just put `"ollama"`.
 - `modelId`: The exact model identifier the API expects.
 
-### Step 2: Set the AI Provider to "Custom"
+### Step 2: Select Your Provider in the Chat UI
 
-In your VS Code settings UI, navigate to `Superdesign > AI Model Provider` and select `custom` from the dropdown menu.
+Once configured, your custom providers will automatically appear in the model selector dropdown at the top of the Superdesign chat panel, grouped under "Custom".
 
-### Step 3: Select Your Active Provider
+- **Switching Models**: Simply open the dropdown and select any official or custom model. The extension will handle the rest.
+- **No Manual Settings Change Needed**: You no longer need to manually set the "AI Model Provider" to `custom` in the settings. Selecting a custom model from the dropdown will do this for you automatically.
 
-Once you select `custom`, a Quick Pick menu will automatically appear, allowing you to choose which of your configured providers you want to use.
-
-You can also change the active provider at any time by running the **`Superdesign: Set Active Custom Provider`** command from the Command Palette (`Ctrl+Shift+P`).
+You can still use the **`Superdesign: Set Active Custom Provider`** command from the Command Palette (`Ctrl+Shift+P`) if you prefer that workflow.
 
 ---
 

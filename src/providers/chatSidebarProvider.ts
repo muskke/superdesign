@@ -95,36 +95,90 @@ export class ChatSidebarProvider implements vscode.WebviewViewProvider {
         );
     }
 
+    public notifyProviderChanged(modelId: string) {
+        const provider = modelId.startsWith('custom/') ? 'custom' : 'anthropic'; // Basic provider logic for notification
+        this.sendMessage({
+            command: 'providerChanged',
+            provider: provider,
+            model: modelId
+        });
+    }
+
     private async handleGetCurrentProvider(webview: vscode.Webview) {
         const config = vscode.workspace.getConfiguration('superdesign');
         const currentProvider = config.get<string>('aiModelProvider', 'anthropic');
-        const currentModel = config.get<string>('aiModel');
+        let currentModel = config.get<string>('aiModel');
         
-        // If no specific model is set, use defaults
-        let defaultModel: string;
-        switch (currentProvider) {
-            case 'openai':
-                defaultModel = 'gpt-4o';
-                break;
-            case 'openrouter':
-                defaultModel = 'anthropic/claude-3-7-sonnet-20250219';
-                break;
-            case 'anthropic':
-            default:
-                defaultModel = 'claude-3-5-sonnet-20241022';
-                break;
+        const customProviders = config.get<any[]>('customProviders', []);
+        
+        if (currentProvider === 'custom') {
+            const activeProviderName = config.get<string>('activeCustomProviderName');
+            const activeProvider = customProviders.find(p => p.name === activeProviderName);
+            if (activeProvider) {
+                // Use a special format to identify custom models in the frontend
+                currentModel = `custom/${activeProvider.name}`;
+            } else if (customProviders.length > 0) {
+                // If no active provider is set, default to the first one
+                currentModel = `custom/${customProviders[0].name}`;
+                // Also update the configuration to reflect this default
+                await config.update('activeCustomProviderName', customProviders[0].name, vscode.ConfigurationTarget.Global);
+            } else {
+                // Fallback if no custom providers are configured
+                currentModel = 'claude-3-5-sonnet-20241022';
+            }
+        } else {
+            // If no specific model is set for official providers, use defaults
+            if (!currentModel) {
+                switch (currentProvider) {
+                    case 'openai':
+                        currentModel = 'gpt-4o';
+                        break;
+                    case 'openrouter':
+                        currentModel = 'anthropic/claude-3-7-sonnet-20250219';
+                        break;
+                    case 'anthropic':
+                    default:
+                        currentModel = 'claude-3-5-sonnet-20241022';
+                        break;
+                }
+            }
         }
         
         webview.postMessage({
             command: 'currentProviderResponse',
             provider: currentProvider,
-            model: currentModel || defaultModel
+            model: currentModel,
+            customProviders: customProviders.map(p => ({
+                id: `custom/${p.name}`,
+                name: p.name,
+                provider: `Custom (${p.protocol})`,
+                category: 'Custom'
+            }))
         });
     }
 
     private async handleChangeProvider(model: string, webview: vscode.Webview) {
         try {
             const config = vscode.workspace.getConfiguration('superdesign');
+
+            if (model.startsWith('custom/')) {
+                const providerName = model.replace('custom/', '');
+                await config.update('aiModelProvider', 'custom', vscode.ConfigurationTarget.Global);
+                await config.update('activeCustomProviderName', providerName, vscode.ConfigurationTarget.Global);
+                
+                // When switching to a custom provider, we don't set a specific 'aiModel'
+                // as the modelId is part of the custom provider's definition.
+                // We can clear it or leave it, but for consistency, let's clear it.
+                await config.update('aiModel', undefined, vscode.ConfigurationTarget.Global);
+
+                // Notify webview of successful change
+                webview.postMessage({
+                    command: 'providerChanged',
+                    provider: 'custom',
+                    model: model
+                });
+                return; // Exit early as we've handled the custom case
+            }
             
             // Determine provider and API key based on model
             let provider: string;
