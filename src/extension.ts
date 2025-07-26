@@ -1248,9 +1248,19 @@ export function activate(context: vscode.ExtensionContext) {
 	// Note: Users can manually open output via View → Output → Select "Superdesign" if needed
 
 	// Initialize Custom Agent service
-	Logger.info('Creating CustomAgentService...');
-	const customAgent = new CustomAgentService(Logger.getOutputChannel());
-	Logger.info('CustomAgentService created');
+	let customAgent: CustomAgentService;
+	try {
+		Logger.info('Initializing CustomAgentService...');
+		customAgent = new CustomAgentService(Logger.getOutputChannel());
+		Logger.info('CustomAgentService initialized successfully.');
+	} catch (error) {
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		Logger.error(`Failed to initialize CustomAgentService: ${errorMessage}`);
+		vscode.window.showErrorMessage(`Failed to initialize Superdesign Agent Service: ${errorMessage}`);
+		// If the agent service fails, we should not proceed with activating the rest of the extension
+		// that depends on it.
+		return;
+	}
 
 	// The command has been defined in the package.json file
 	// Now provide the implementation of the command with registerCommand
@@ -1387,8 +1397,27 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
+	// Register command to set the active custom provider
+	const setActiveCustomProviderDisposable = vscode.commands.registerCommand('superdesign.setActiveCustomProvider', async () => {
+		await promptForCustomProvider();
+	});
+
+	// Listen for configuration changes
+	const onDidChangeConfigurationDisposable = vscode.workspace.onDidChangeConfiguration(async (event) => {
+		if (event.affectsConfiguration('superdesign.aiModelProvider')) {
+			const config = vscode.workspace.getConfiguration('superdesign');
+			const provider = config.get<string>('aiModelProvider');
+			if (provider === 'custom') {
+				// Use a timeout to ensure the configuration has settled
+				setTimeout(() => {
+					promptForCustomProvider();
+				}, 100);
+			}
+		}
+	});
+
 	context.subscriptions.push(
-		helloWorldDisposable, 
+		helloWorldDisposable,
 		configureApiKeyDisposable,
 		configureOpenAIApiKeyDisposable,
 		configureOpenRouterApiKeyDisposable,
@@ -1399,8 +1428,50 @@ export function activate(context: vscode.ExtensionContext) {
 		resetWelcomeDisposable,
 		initializeProjectDisposable,
 		openSettingsDisposable,
-		configureApiKeyQuickDisposable
+		configureApiKeyQuickDisposable,
+		setActiveCustomProviderDisposable,
+		onDidChangeConfigurationDisposable
 	);
+}
+
+// Function to prompt the user to select a custom provider
+async function promptForCustomProvider() {
+	const config = vscode.workspace.getConfiguration('superdesign');
+	const customProviders = config.get<any[]>('customProviders', []);
+
+	if (customProviders.length === 0) {
+		vscode.window.showWarningMessage(
+			'The AI provider is set to "custom", but no custom providers are configured.',
+			'Open Settings'
+		).then(selection => {
+			if (selection === 'Open Settings') {
+				vscode.commands.executeCommand('workbench.action.openSettings', 'superdesign.customProviders');
+			}
+		});
+		return;
+	}
+
+	const providerNames = customProviders.map(p => ({
+		label: p.name || 'Unnamed Provider',
+		description: `${p.protocol} - ${p.baseURL}`,
+		detail: `Model: ${p.modelId}`,
+		name: p.name
+	}));
+
+	const selectedProvider = await vscode.window.showQuickPick(providerNames, {
+		title: 'Select an Active Custom AI Provider',
+		placeHolder: 'Choose which custom provider to use for AI features',
+	});
+
+	if (selectedProvider && selectedProvider.name) {
+		try {
+			await config.update('activeCustomProviderName', selectedProvider.name, vscode.ConfigurationTarget.Global);
+			vscode.window.showInformationMessage(`✅ Custom AI provider set to: ${selectedProvider.name}`);
+		} catch (error) {
+			Logger.error(`Failed to set active custom provider: ${error}`);
+			vscode.window.showErrorMessage(`Failed to save active custom provider setting: ${error}`);
+		}
+	}
 }
 
 // Function to configure Anthropic API key

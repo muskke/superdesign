@@ -1,6 +1,8 @@
 import { streamText, CoreMessage } from 'ai';
+import { FetchFunction } from '@ai-sdk/provider-utils';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import * as vscode from 'vscode';
 import * as path from 'path';
@@ -77,6 +79,20 @@ export class CustomAgentService implements AgentService {
         }
     }
 
+    private loggingFetch: FetchFunction = (url, options) => {
+        this.outputChannel.appendLine('===== AI SDK RAW REQUEST =====');
+        this.outputChannel.appendLine(`URL: ${url}`);
+        this.outputChannel.appendLine(`METHOD: ${options?.method ?? 'N/A'}`);
+        this.outputChannel.appendLine(`HEADERS: ${JSON.stringify(options?.headers ?? {}, null, 2)}`);
+        this.outputChannel.appendLine(`BODY: ${options?.body ?? 'N/A'}`);
+        this.outputChannel.appendLine('============================');
+        console.debug("URL: ", url);
+        console.debug("METHOD: ", options?.method ?? 'N/A');
+        console.debug("HEADERS: ", JSON.stringify(options?.headers ?? {}, null, 2));
+        console.debug("BODY: ", options?.body ?? 'N/A');
+        return fetch(url, options);
+    };
+
     private getModel() {
         const config = vscode.workspace.getConfiguration('superdesign');
         const specificModel = config.get<string>('aiModel');
@@ -89,7 +105,9 @@ export class CustomAgentService implements AgentService {
         
         // Determine provider from model name if specific model is set
         let effectiveProvider = provider;
-        if (specificModel) {
+        // If a specific model is set, we might be able to infer the provider.
+        // However, with the introduction of "custom", the user's selection of `aiModelProvider` is more important.
+        if (provider !== 'custom' && specificModel) {
             if (specificModel.includes('/')) {
                 effectiveProvider = 'openrouter';
             } else if (specificModel.startsWith('claude-')) {
@@ -100,6 +118,57 @@ export class CustomAgentService implements AgentService {
         }
         
         switch (effectiveProvider) {
+            case 'custom':
+                const customProviders = config.get<any[]>('customProviders', []);
+                const activeProviderName = config.get<string>('activeCustomProviderName');
+
+                if (customProviders.length === 0) {
+                    throw new Error('Custom provider is selected, but no custom providers are configured in settings.');
+                }
+                if (!activeProviderName) {
+                    throw new Error('Custom provider is selected, but an active provider has not been chosen. Please run the "Superdesign: Set Active Provider" command.');
+                }
+
+                const customProvider = customProviders.find(p => p.name === activeProviderName);
+
+                if (!customProvider) {
+                    throw new Error(`The active custom provider "${activeProviderName}" was not found in your configuration.`);
+                }
+                
+                if (!customProvider.name || !customProvider.protocol || !customProvider.baseURL || !customProvider.apiKey || !customProvider.modelId) {
+                    throw new Error(`The custom provider "${activeProviderName}" is incomplete. It must have name, protocol, baseURL, apiKey, and modelId.`);
+                }
+
+                this.outputChannel.appendLine(`Using Custom Provider: "${customProvider.name}"`);
+                this.outputChannel.appendLine(`  -> Protocol: ${customProvider.protocol}`);
+                this.outputChannel.appendLine(`  -> Model: ${customProvider.modelId}`);
+
+                switch (customProvider.protocol) {
+                    case 'openai':
+                        const customOpenai = createOpenAI({
+                            apiKey: customProvider.apiKey,
+                            baseURL: customProvider.baseURL,
+                            fetch: this.loggingFetch,
+                        });
+                        return customOpenai(customProvider.modelId);
+                    case 'anthropic':
+                        const customAnthropic = createAnthropic({
+                            apiKey: customProvider.apiKey,
+                            baseURL: customProvider.baseURL,
+                            fetch: this.loggingFetch,
+                        });
+                        return customAnthropic(customProvider.modelId);
+                    case 'gemini':
+                        const customGemini = createGoogleGenerativeAI({
+                            apiKey: customProvider.apiKey,
+                            baseURL: customProvider.baseURL,
+                            fetch: this.loggingFetch,
+                        });
+                        return customGemini(customProvider.modelId);
+                    default:
+                        throw new Error(`Unsupported protocol "${customProvider.protocol}" for custom provider "${customProvider.name}".`);
+                }
+
             case 'openrouter':
                 const openrouterKey = config.get<string>('openrouterApiKey');
                 if (!openrouterKey) {
@@ -109,7 +178,8 @@ export class CustomAgentService implements AgentService {
                 this.outputChannel.appendLine(`OpenRouter API key found: ${openrouterKey.substring(0, 12)}...`);
                 
                 const openrouter = createOpenRouter({
-                    apiKey: openrouterKey
+                    apiKey: openrouterKey,
+                    fetch: this.loggingFetch,
                 });
                 
                 // Use specific model if available, otherwise default to Claude 3.7 Sonnet via OpenRouter
@@ -127,10 +197,7 @@ export class CustomAgentService implements AgentService {
                 
                 const anthropic = createAnthropic({
                     apiKey: anthropicKey,
-                    baseURL: "https://anthropic.helicone.ai/v1",
-                    headers: {
-                        "Helicone-Auth": `Bearer sk-helicone-utidjzi-eprey7i-tvjl25y-yl7mosi`,
-                    }
+                    fetch: this.loggingFetch,
                 });
                 
                 // Use specific model if available, otherwise default to claude-3-5-sonnet
@@ -149,10 +216,7 @@ export class CustomAgentService implements AgentService {
                 
                 const openai = createOpenAI({
                     apiKey: openaiKey,
-                    baseURL: "https://oai.helicone.ai/v1",
-                    headers: {
-                        "Helicone-Auth": `Bearer sk-helicone-utidjzi-eprey7i-tvjl25y-yl7mosi`,
-                    }
+                    fetch: this.loggingFetch,
                 });
                 
                 // Use specific model if available, otherwise default to gpt-4o
@@ -169,7 +233,12 @@ export class CustomAgentService implements AgentService {
         
         // Determine the actual model name being used
         let modelName: string;
-        if (specificModel) {
+        if (provider === 'custom') {
+            const customProviders = config.get<any[]>('customProviders', []);
+            const activeProviderName = config.get<string>('activeCustomProviderName');
+            const activeProvider = customProviders.find(p => p.name === activeProviderName);
+            modelName = activeProvider?.modelId || 'custom-model-not-selected';
+        } else if (specificModel) {
             modelName = specificModel;
         } else {
             // Use defaults based on provider
@@ -890,7 +959,7 @@ I've created the html design, please reveiw and let me know if you need any chan
         
         // Determine provider from model name if specific model is set
         let effectiveProvider = provider;
-        if (specificModel) {
+        if (provider !== 'custom' && specificModel) {
             if (specificModel.includes('/')) {
                 effectiveProvider = 'openrouter';
             } else if (specificModel.startsWith('claude-')) {
@@ -901,6 +970,14 @@ I've created the html design, please reveiw and let me know if you need any chan
         }
         
         switch (effectiveProvider) {
+            case 'custom':
+                const customProviders = config.get<any[]>('customProviders', []);
+                const activeProviderName = config.get<string>('activeCustomProviderName');
+                if (customProviders.length === 0 || !activeProviderName) {
+                    return false;
+                }
+                const activeProvider = customProviders.find(p => p.name === activeProviderName);
+                return !!activeProvider?.apiKey;
             case 'openrouter':
                 return !!config.get<string>('openrouterApiKey');
             case 'anthropic':

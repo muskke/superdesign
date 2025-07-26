@@ -5,23 +5,24 @@ interface ModelSelectorProps {
     selectedModel: string;
     onModelChange: (model: string) => void;
     disabled?: boolean;
+    customProviders: ModelOption[];
 }
 
-interface ModelOption {
+export interface ModelOption {
     id: string;
     name: string;
     provider: string;
     category: string;
 }
 
-const ModelSelector: React.FC<ModelSelectorProps> = ({ selectedModel, onModelChange, disabled }) => {
+const ModelSelector: React.FC<ModelSelectorProps> = ({ selectedModel, onModelChange, disabled, customProviders }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
     const triggerRef = useRef<HTMLButtonElement>(null);
     const modalRef = useRef<HTMLDivElement>(null);
 
-    const models: ModelOption[] = [
+    const officialModels: ModelOption[] = [
         // Anthropic
         { id: 'claude-4-opus-20250514', name: 'Claude 4 Opus', provider: 'Anthropic', category: 'Premium' },
         { id: 'claude-4-sonnet-20250514', name: 'Claude 4 Sonnet', provider: 'Anthropic', category: 'Balanced' },
@@ -58,12 +59,14 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ selectedModel, onModelCha
         { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', provider: 'OpenAI', category: 'Fast' }
     ];
 
-    const filteredModels = models.filter(model =>
+    const allModels = [...officialModels, ...customProviders];
+
+    const filteredModels = allModels.filter(model =>
         model.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         model.provider.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const selectedModelName = models.find(m => m.id === selectedModel)?.name || selectedModel;
+    const selectedModelName = allModels.find(m => m.id === selectedModel)?.name || selectedModel.replace('custom/', '');
 
     const calculateDropdownPosition = () => {
         if (!triggerRef.current) return;
@@ -246,6 +249,12 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ selectedModel, onModelCha
                         overflow-x: hidden;
                     }
 
+                    .list-separator {
+                        height: 1px;
+                        background-color: var(--vscode-dropdown-border);
+                        margin: 4px 8px;
+                    }
+
                     .model-selector-list::-webkit-scrollbar {
                         width: 6px;
                     }
@@ -407,24 +416,32 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ selectedModel, onModelCha
                             </div>
 
                             <div className="model-selector-list">
-                                {filteredModels.map((model) => (
-                                    <button
-                                        key={model.id}
-                                        className={`model-option ${model.id === selectedModel ? 'selected' : ''}`}
-                                        onClick={() => handleModelSelect(model.id)}
-                                    >
-                                        <div className="model-icon">
-                                            <BrainIcon />
-                                        </div>
-                                        <div className="model-info">
-                                            <div className="model-name">{model.name}</div>
-                                            <div className="model-provider">{model.provider}</div>
-                                        </div>
-                                        {model.id === selectedModel && (
-                                            <div className="model-check">✓</div>
-                                        )}
-                                    </button>
-                                ))}
+                                {filteredModels.map((model, index) => {
+                                    const isCustomProvider = customProviders.some(p => p.id === model.id);
+                                    const prevModel = index > 0 ? filteredModels[index - 1] : null;
+                                    const isFirstCustom = isCustomProvider && (!prevModel || !customProviders.some(p => p.id === prevModel.id));
+                                    
+                                    return (
+                                        <React.Fragment key={model.id}>
+                                            {isFirstCustom && <div className="list-separator" />}
+                                            <button
+                                                className={`model-option ${model.id === selectedModel ? 'selected' : ''}`}
+                                                onClick={() => handleModelSelect(model.id)}
+                                            >
+                                                <div className="model-icon">
+                                                    <BrainIcon />
+                                                </div>
+                                                <div className="model-info">
+                                                    <div className="model-name">{model.name}</div>
+                                                    <div className="model-provider">{model.provider}</div>
+                                                </div>
+                                                {model.id === selectedModel && (
+                                                    <div className="model-check">✓</div>
+                                                )}
+                                            </button>
+                                        </React.Fragment>
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>

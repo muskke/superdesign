@@ -50,6 +50,59 @@ Works seamlessly with Cursor, Windsurf, Claude Code, and plain VS Code.
 
 ---
 
+## 🔌 Connecting to Custom AI Providers (Ollama, Groq, etc.)
+
+Superdesign allows you to connect to any self-hosted or custom AI model endpoint, as long as it's compatible with the OpenAI, Anthropic, or Google Gemini API formats. This is perfect for using local models with Ollama, or connecting to other services like Groq, custom proxies, and more.
+
+### Step 1: Configure Your Providers in `settings.json`
+
+Open your VS Code User Settings (JSON) file and add the `superdesign.customProviders` configuration. Here is an example for connecting to a local Ollama instance, the Groq API, and a Gemini-compatible endpoint:
+
+```json
+"superdesign.customProviders": [
+    {
+        "name": "Local Llama3 (Ollama)",
+        "protocol": "openai",
+        "baseURL": "http://localhost:11434/v1",
+        "apiKey": "ollama",
+        "modelId": "llama3"
+    },
+    {
+        "name": "Groq Llama3 70b",
+        "protocol": "openai",
+        "baseURL": "https://api.groq.com/openai/v1",
+        "apiKey": "gsk_YOUR_GROQ_API_KEY",
+        "modelId": "llama3-70b-8192"
+    },
+    {
+        "name": "My Custom Gemini Proxy",
+        "protocol": "gemini",
+        "baseURL": "https://my-gemini-proxy.example.com/v1beta",
+        "apiKey": "YOUR_GEMINI_API_KEY",
+        "modelId": "models/gemini-1.5-pro-latest"
+    }
+]
+```
+
+**Field Descriptions:**
+- `name`: A unique, recognizable name for your provider.
+- `protocol`: The API format the endpoint uses. Can be `"openai"`, `"anthropic"`, or `"gemini"`.
+- `baseURL`: The base URL of the API endpoint.
+- `apiKey`: The API key for the service. For local Ollama, you can just put `"ollama"`.
+- `modelId`: The exact model identifier the API expects.
+
+### Step 2: Set the AI Provider to "Custom"
+
+In your VS Code settings UI, navigate to `Superdesign > AI Model Provider` and select `custom` from the dropdown menu.
+
+### Step 3: Select Your Active Provider
+
+Once you select `custom`, a Quick Pick menu will automatically appear, allowing you to choose which of your configured providers you want to use.
+
+You can also change the active provider at any time by running the **`Superdesign: Set Active Custom Provider`** command from the Command Palette (`Ctrl+Shift+P`).
+
+---
+
 ## Can I use my own Claude Code or Cursor subscription?
 Yes, after you initialise superdesign extension, some cursor/claude code rules will be added, so you can prompt the agent to do design and preview in superdesign canva (cmd + shift + p -> superdesign: open canva)
 
