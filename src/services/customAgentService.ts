@@ -80,16 +80,16 @@ export class CustomAgentService implements AgentService {
     }
 
     private loggingFetch: FetchFunction = (url, options) => {
-        this.outputChannel.appendLine('===== AI SDK RAW REQUEST =====');
-        this.outputChannel.appendLine(`URL: ${url}`);
-        this.outputChannel.appendLine(`METHOD: ${options?.method ?? 'N/A'}`);
-        this.outputChannel.appendLine(`HEADERS: ${JSON.stringify(options?.headers ?? {}, null, 2)}`);
-        this.outputChannel.appendLine(`BODY: ${options?.body ?? 'N/A'}`);
-        this.outputChannel.appendLine('============================');
-        console.debug("URL: ", url);
-        console.debug("METHOD: ", options?.method ?? 'N/A');
-        console.debug("HEADERS: ", JSON.stringify(options?.headers ?? {}, null, 2));
-        console.debug("BODY: ", options?.body ?? 'N/A');
+        // this.outputChannel.appendLine('===== AI SDK RAW REQUEST =====');
+        // this.outputChannel.appendLine(`URL: ${url}`);
+        // this.outputChannel.appendLine(`METHOD: ${options?.method ?? 'N/A'}`);
+        // this.outputChannel.appendLine(`HEADERS: ${JSON.stringify(options?.headers ?? {}, null, 2)}`);
+        // this.outputChannel.appendLine(`BODY: ${options?.body ?? 'N/A'}`);
+        // this.outputChannel.appendLine('============================');
+        // console.debug("URL: ", url);
+        // console.debug("METHOD: ", options?.method ?? 'N/A');
+        // console.debug("HEADERS: ", JSON.stringify(options?.headers ?? {}, null, 2));
+        // console.debug("BODY: ", options?.body ?? 'N/A');
         return fetch(url, options);
     };
 
